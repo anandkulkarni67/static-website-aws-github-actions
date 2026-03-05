@@ -1,0 +1,150 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'A template to create resources for about-me website.'
+
+Parameters:
+  ApplicationName:
+    Type: String
+    Default: 'static-website-aws-github-actions'
+
+Resources:
+  SourceCodeRepository:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join ['-', [!Ref ApplicationName, 'source']]
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  StaticContentRepository:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join ['-', [!Ref ApplicationName, 'static', 'content']]
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  StaticContentRepositoryPolicy:
+    Type: AWS::S3::BucketPolicy
+    DependsOn: CloudfrontOriginAccessIdentity
+    Properties:
+      Bucket: !Ref StaticContentRepository
+      PolicyDocument:
+        Statement:
+          - Action:
+              - 's3:GetObject'
+            Effect: 'Allow'
+            Resource:
+              Fn::Join:
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref StaticContentRepository
+                  - '/*'
+            Principal:
+              AWS: !Join ['', ['arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ', !Ref CloudfrontOriginAccessIdentity]]
+            Condition:
+              Bool:
+                aws:SecureTransport: true
+
+  SourceCodeRepositoryPolicy:
+    Type: AWS::S3::BucketPolicy
+    DependsOn: CloudfrontOriginAccessIdentity
+    Properties:
+      Bucket: !Ref SourceCodeRepository
+      PolicyDocument:
+        Statement:
+          - Action:
+              - 's3:PutObject'
+              - 's3:DeleteObject'
+            Effect: 'Allow'
+            Principal:
+              Service: codebuild.amazonaws.com
+            Resource:
+              Fn::Join:
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref SourceCodeRepository
+                  - '/*'
+          - Action:
+              - 's3:GetObject'
+            Effect: 'Allow'
+            Resource:
+              Fn::Join:
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref SourceCodeRepository
+                  - '/*'
+            Principal:
+              AWS: !Join ['', ['arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ', !Ref CloudfrontOriginAccessIdentity]]
+            Condition:
+              Bool:
+                aws:SecureTransport: true
+
+  CloudfrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Join ['-', [!Ref ApplicationName, 'origin', 'access', 'identity' ]]
+
+  Cloudfront:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        CustomErrorResponses:
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: '/'
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: '/'
+        CacheBehaviors:
+          - PathPattern: 'photography/*'
+            AllowedMethods:
+              - 'GET'
+              - 'HEAD'
+            DefaultTTL: 300
+            MaxTTL: 300
+            MinTTL: 0
+            ForwardedValues:
+              QueryString: false
+            ViewerProtocolPolicy: redirect-to-https
+            TargetOriginId: !Join ['-', [!Ref ApplicationName, 'S3', 'static', 'content', 'origin']]
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - 'GET'
+            - 'HEAD'
+          DefaultTTL: 300
+          MaxTTL: 300
+          MinTTL: 0
+          ForwardedValues:
+            QueryString: false
+          ViewerProtocolPolicy: redirect-to-https
+          TargetOriginId: !Join ['-', [!Ref ApplicationName, 'S3', 'source', 'origin' ]]
+        DefaultRootObject: index.html
+        Enabled: true
+        HttpVersion: http2
+        IPV6Enabled: false
+        Origins:
+          - DomainName: !GetAtt SourceCodeRepository.DomainName
+            Id: !Join ['-', [!Ref ApplicationName, 'S3', 'source', 'origin']]
+            S3OriginConfig:
+              OriginAccessIdentity: !Join ['', ['origin-access-identity/cloudfront/', !Ref CloudfrontOriginAccessIdentity]]
+        PriceClass: PriceClass_200
+        Restrictions:
+          GeoRestriction:
+            Locations:
+              - 'IN'
+              - 'US'
+              - 'GB'
+            RestrictionType: whitelist
+
+
+Outputs:
+  SourceCodeRepositoryName:
+    Value: !Ref SourceCodeRepository
+    Export:
+      Name: !Join ['-', [!Ref ApplicationName, 'source' ]]
+    Description: "Name of S3 bucket that holds website content"

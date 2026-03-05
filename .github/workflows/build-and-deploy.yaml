@@ -1,0 +1,71 @@
+# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
+
+name: Build an artifact
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  build-artifact:
+    name: build-artifact
+    runs-on: ubuntu-latest
+    environment: production
+    outputs:
+      artifact-name: ${{ steps.install-and-build.outputs.artifact-name }}
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+    - name: Set up NodeJS environment
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22.x
+        cache: npm
+    - name: install dependencies and build application
+      id: install-and-build
+      run: |
+        npm install
+        npm run build
+        application_version=$(npm --loglevel silent run version)
+        application_name=$(npm --loglevel silent run name)
+        application_path=$(pwd)
+        echo $application_version
+        echo $application_name
+        echo $application_path
+        echo "artifact-name=$application_name-$application_version" >> "$GITHUB_OUTPUT"
+        echo "application-path=$application_path" >> "$GITHUB_OUTPUT"
+    - name: Upload application artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.install-and-build.outputs.artifact-name }}
+        path: ${{ steps.install-and-build.outputs.application-path }}/dist
+        overwrite: true
+        if-no-files-found: warn
+        retention-days: 1
+
+  deploy-artifact:
+    name: deploy-artifact
+    runs-on: ubuntu-latest
+    environment: production
+    needs: build-artifact
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS Credentials for deployment
+        uses: aws-actions/configure-aws-credentials@v5.1.1
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.OIDC_ROLE_NAME }}
+          output-credentials: true
+      - name: Download application artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build-artifact.outputs.artifact-name }}
+          path: artifact
+      - name: deploy application artifacts
+        run: |
+          aws s3 rm s3://${{ vars.APPLICATION_NAME }}-source --recursive
+          aws s3 cp --recursive artifact s3://${{ vars.APPLICATION_NAME }}-source/
