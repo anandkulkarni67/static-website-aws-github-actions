@@ -24,7 +24,11 @@ Recommended Order:
 
 ## GitHub integration
 ```
-1. Go to AWS Console -> AWS CodePipeline -> Settings ( Left Side-panel ) -> Connections
-2. Click on the pending connection.
-3. Follow the prompts on screen to establish connection between AWS and Github repository/s.
+1. Go to the source code github repository.
+2. Click on Settings.
+3. Click on Environments on the side panel and create a 'production' environment.
+4. Create three secret environment variables.
+   AWS_REGION ( AWS region in which resources are deployed )
+   AWS_ACCOUNT_ID ( ID of the AWS account where resources are deployed )
+   OIDC_ROLE_NAME ( you can find this value in the output of Security cloudformation stack )
 ```
