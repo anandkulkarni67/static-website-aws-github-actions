@@ -30,5 +30,7 @@ Recommended Order:
 4. Create three secret environment variables.
    AWS_REGION ( AWS region in which resources are deployed )
    AWS_ACCOUNT_ID ( ID of the AWS account where resources are deployed )
-   OIDC_ROLE_NAME ( you can find this value in the output of Security cloudformation stack )
+   OIDC_ROLE_NAME ( you can find this value in the output of 'security' cloudformation stack )
+5. Create a standard environment variable.
+   APPLICATION_NAME ( must be same as the one used when creating an 'application' stack. )
 ```
