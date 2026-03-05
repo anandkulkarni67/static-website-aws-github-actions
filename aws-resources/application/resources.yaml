@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'A template to create resources for about-me website.'
+Description: 'A template to create resources for a static website.
 
 Parameters:
   ApplicationName:
@@ -17,38 +17,6 @@ Resources:
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
 
-  StaticContentRepository:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Join ['-', [!Ref ApplicationName, 'static', 'content']]
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
-
-  StaticContentRepositoryPolicy:
-    Type: AWS::S3::BucketPolicy
-    DependsOn: CloudfrontOriginAccessIdentity
-    Properties:
-      Bucket: !Ref StaticContentRepository
-      PolicyDocument:
-        Statement:
-          - Action:
-              - 's3:GetObject'
-            Effect: 'Allow'
-            Resource:
-              Fn::Join:
-                - ''
-                - - 'arn:aws:s3:::'
-                  - !Ref StaticContentRepository
-                  - '/*'
-            Principal:
-              AWS: !Join ['', ['arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ', !Ref CloudfrontOriginAccessIdentity]]
-            Condition:
-              Bool:
-                aws:SecureTransport: true
-
   SourceCodeRepositoryPolicy:
     Type: AWS::S3::BucketPolicy
     DependsOn: CloudfrontOriginAccessIdentity
@@ -56,18 +24,6 @@ Resources:
       Bucket: !Ref SourceCodeRepository
       PolicyDocument:
         Statement:
-          - Action:
-              - 's3:PutObject'
-              - 's3:DeleteObject'
-            Effect: 'Allow'
-            Principal:
-              Service: codebuild.amazonaws.com
-            Resource:
-              Fn::Join:
-                - ''
-                - - 'arn:aws:s3:::'
-                  - !Ref SourceCodeRepository
-                  - '/*'
           - Action:
               - 's3:GetObject'
             Effect: 'Allow'
@@ -100,18 +56,6 @@ Resources:
           - ErrorCode: 403
             ResponseCode: 200
             ResponsePagePath: '/'
-        CacheBehaviors:
-          - PathPattern: 'photography/*'
-            AllowedMethods:
-              - 'GET'
-              - 'HEAD'
-            DefaultTTL: 300
-            MaxTTL: 300
-            MinTTL: 0
-            ForwardedValues:
-              QueryString: false
-            ViewerProtocolPolicy: redirect-to-https
-            TargetOriginId: !Join ['-', [!Ref ApplicationName, 'S3', 'static', 'content', 'origin']]
         DefaultCacheBehavior:
           AllowedMethods:
             - 'GET'
